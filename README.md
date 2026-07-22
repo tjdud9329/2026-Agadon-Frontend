@@ -1,11 +1,14 @@
 # Agadon
 애거돈 프론트엔드 레포지토리
 
+
+
 폴더 구조
 ~~~
 src/
 ├── pages/
 ├── components/
+│   └── layout/
 ├── api/
 ├── stores/
 ├── hooks/
@@ -14,8 +17,17 @@ src/
 ~~~
 
 
+
+📌 브랜치 컨벤션
+
+- main : 배포용 브랜치
+- feature/기능명 : 새로운 기능 개발
+- fix/버그명 : 버그 수정
+- hotfix/긴급수정명 : 긴급 수정
+
+
+
 📝 커밋 컨벤션
-commit message는 [Type] 작성 내용 으로 통일합니다
 
 - [Feat] : 새로운 기능 구현
 - [Mod] : 코드 수정 및 내부 파일 수정
