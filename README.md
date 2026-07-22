@@ -3,7 +3,7 @@
 
 
 
-폴더 구조
+## 폴더 구조
 ~~~
 src/
 ├── pages/
@@ -16,18 +16,25 @@ src/
 └── main.jsx
 ~~~
 
+## 💌 네이밍 컨벤션
+
+- 컴포넌트 or 페이지 : PascalCase
+  - 예) `Button.jsx`, `RouteCard.jsx`, `HomePage.jsx`
+
+- 그 외 파일(API, Store, Hook, Util 등) : camelCase
+  - 예) `storeApi.js`, `axiosInstance.js`, `useAuthStore.js`, `formatPrice.js`
 
 
-📌 브랜치 컨벤션
+
+## 📌 브랜치 컨벤션
 
 - main : 배포용 브랜치
 - feature/기능명 : 새로운 기능 개발
 - fix/버그명 : 버그 수정
-- hotfix/긴급수정명 : 긴급 수정
 
 
 
-📝 커밋 컨벤션
+## 📝 커밋 컨벤션
 
 - [Feat] : 새로운 기능 구현
 - [Mod] : 코드 수정 및 내부 파일 수정
