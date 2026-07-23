@@ -1,73 +1,96 @@
 import { useEffect, useRef } from 'react';
+import axiosInstance from '../../api/axiosInstance';
 
-// 홍대입구역 좌표 (고정)
-const HONGDAE_STATION = { lat: 37.5571, lng: 126.9237 };
-
-const KakaoMap = ({ destination, onWalkingTime }) => {
+const KakaoMap = ({ destination }) => {
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
+  const currentCoordsRef = useRef(null);  // 추가
+
+  const startMarkerRef = useRef(null);
+  const endMarkerRef = useRef(null);
+  const polylineRef = useRef(null);
 
   useEffect(() => {
     const kakao = window.kakao;
     if (!kakao) return;
 
     kakao.maps.load(() => {
-      const options = {
-        center: new kakao.maps.LatLng(HONGDAE_STATION.lat, HONGDAE_STATION.lng),
-        level: 5,
-      };
-      const map = new kakao.maps.Map(mapRef.current, options);
-      mapInstance.current = map;
-
-      new kakao.maps.Marker({
-        map,
-        position: new kakao.maps.LatLng(HONGDAE_STATION.lat, HONGDAE_STATION.lng),
-        title: '홍대입구역',
-      });
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => {
+          currentCoordsRef.current = coords;  // 저장
+          const current = new kakao.maps.LatLng(coords.latitude, coords.longitude);
+          const map = new kakao.maps.Map(mapRef.current, { center: current, level: 4 });
+          mapInstance.current = map;
+          startMarkerRef.current = new kakao.maps.Marker({ map, position: current, title: '현재 위치' });
+        },
+        () => {
+          const center = new kakao.maps.LatLng(37.5571, 126.9237);
+          const map = new kakao.maps.Map(mapRef.current, { center, level: 4 });
+          mapInstance.current = map;
+          startMarkerRef.current = new kakao.maps.Marker({ map, position: center, title: '현재 위치' });
+        }
+      );
     });
   }, []);
 
   useEffect(() => {
-    if (!destination || !mapInstance.current) return;
-    const kakao = window.kakao;
+    if (!destination || !mapInstance.current || !currentCoordsRef.current) return;
 
-    const geocoder = new kakao.maps.services.Geocoder();
-    geocoder.addressSearch(destination, (result, status) => {
+    const kakao = window.kakao;
+    const ps = new kakao.maps.services.Places();
+
+    ps.keywordSearch(destination, async (result, status) => {
       if (status !== kakao.maps.services.Status.OK) return;
 
       const destLat = parseFloat(result[0].y);
       const destLng = parseFloat(result[0].x);
-      const coords = new kakao.maps.LatLng(destLat, destLng);
 
-      // 집 마커
-      new kakao.maps.Marker({
-        map: mapInstance.current,
-        position: coords,
-        title: '집',
-      });
+      const { latitude, longitude } = currentCoordsRef.current;  // 저장된 좌표 사용
 
-      // 지도 범위 조정
-      const bounds = new kakao.maps.LatLngBounds();
-      bounds.extend(new kakao.maps.LatLng(HONGDAE_STATION.lat, HONGDAE_STATION.lng));
-      bounds.extend(coords);
-      mapInstance.current.setBounds(bounds);
+      try {
+        const response = await axiosInstance.post('/api/directions', {
+          origin: `${longitude},${latitude}`,
+          destination: `${destLng},${destLat}`,
+        });
 
-      // 도보 시간 계산
-      const polyline = new kakao.maps.Polyline({
-        path: [
-          new kakao.maps.LatLng(HONGDAE_STATION.lat, HONGDAE_STATION.lng),
-          coords,
-        ],
-      });
-      const distanceM = polyline.getLength();
-      const walkingMin = Math.ceil(distanceM / 80);
+        if (endMarkerRef.current) endMarkerRef.current.setMap(null);
+        if (polylineRef.current) polylineRef.current.setMap(null);
 
-      // 부모 컴포넌트에 전달
-      if (onWalkingTime) {
-        onWalkingTime(walkingMin, distanceM);
+        endMarkerRef.current = new kakao.maps.Marker({
+          map: mapInstance.current,
+          position: new kakao.maps.LatLng(destLat, destLng),
+          title: '목적지',
+        });
+
+        const route = response.data.routes[0];
+        const path = [];
+
+        route.sections.forEach((section) => {
+          section.roads.forEach((road) => {
+            const vertexes = road.vertexes;
+            for (let i = 0; i < vertexes.length; i += 2) {
+              path.push(new kakao.maps.LatLng(vertexes[i + 1], vertexes[i]));
+            }
+          });
+        });
+
+        polylineRef.current = new kakao.maps.Polyline({
+          map: mapInstance.current,
+          path,
+          strokeWeight: 6,
+          strokeColor: '#3A7AFE',
+          strokeOpacity: 0.9,
+          strokeStyle: 'solid',
+        });
+
+        const bounds = new kakao.maps.LatLngBounds();
+        path.forEach((point) => bounds.extend(point));
+        mapInstance.current.setBounds(bounds);
+      } catch (err) {
+        console.error('길찾기 API 오류', err);
       }
     });
-  }, [destination, onWalkingTime]);
+  }, [destination]);
 
   return <div ref={mapRef} style={{ width: '100%', height: '500px' }} />;
 };
