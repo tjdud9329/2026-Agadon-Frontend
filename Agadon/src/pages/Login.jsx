@@ -54,7 +54,7 @@ export default function LoginPage({ onLoginSuccess }) {
       }
 
       alert('로그인 성공!');
-      navigate('/menu');
+      navigate('/Menu');
     } catch (error) {
       console.error('로그인 실패:', error);
       alert(

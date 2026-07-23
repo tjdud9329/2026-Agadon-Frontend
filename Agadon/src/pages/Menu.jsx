@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Navbar from '../components/layouts/Navbar';
 import KakaoMap from '../components/layouts/KakaoMap';
 import useCurrentLocation from '../hooks/useCurrentLocation';
-import { calcWalkingTime } from '../hooks/calcWalkingTime';
+import CircularTimer from '../components/main/CircularTimer';
 
 const Menu = () => {
   const { address: currentAddr } = useCurrentLocation();
@@ -20,33 +20,29 @@ const Menu = () => {
 
   return (
     <div>
-      {/* 상단 */}
-      <header>
-        <div>
-          <div>현위치</div>
-          <div>{currentAddr || '위치 불러오는 중...'}</div>
-        </div>
+      <CircularTimer />
+      <div>현위치: {currentAddr || '위치 불러오는 중...'}</div>
 
-        <div>
-          <input
-            type="text"
-            placeholder="도착지를 입력하세요"
-            value={destination}
-            onChange={(e) => setDestination(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          />
+      <input
+        type="text"
+        placeholder="도착지를 입력하세요"
+        value={address}
+        onChange={(e) => setAddress(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+      />
+      <button onClick={handleSearch}>검색</button>
 
-          <button className="hover" onClick={handleSearch}>검색</button>
-        </div>
-      </header>
+      <KakaoMap
+        destination={searchedAddr}
+        onWalkingTime={(min, m) => setWalkInfo({ minutes: min, meters: m })}
+      />
 
-      {/* 지도 */}
-      <section>
-        <KakaoMap destination={searchedDestination} />
-      </section>
-
-      {/* 하단 네비 */}
-      <Navbar />
+      {walkInfo && (
+        <p>
+          홍대입구역까지 도보 약 {walkInfo.minutes}분 (직선{' '}
+          {(walkInfo.meters / 1000).toFixed(1)}km)
+        </p>
+      )}
     </div>
   );
 };
