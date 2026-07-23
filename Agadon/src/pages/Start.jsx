@@ -1,4 +1,3 @@
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import red_alarm from '../assets/red_alarm.svg';
 

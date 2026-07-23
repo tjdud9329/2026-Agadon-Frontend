@@ -1,6 +1,4 @@
-import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useState } from 'react';
 
 // 아이콘 assets import
 import red_alarm from '../../assets/red_alarm.svg';

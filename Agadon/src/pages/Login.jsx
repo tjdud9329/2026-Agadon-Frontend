@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import red_alarm from '../assets/red_alarm.svg';
 import api from '../api/axiosInstance';
