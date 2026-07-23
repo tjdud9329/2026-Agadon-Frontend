@@ -211,9 +211,9 @@ export default function CircularTimer({
       </div>
 
       {/* 2. [다른 방법 보기] 버튼 */}
-      <div className="w-full flex items-center justify-between px-2 mt-4 relative z-50">
+      <div className="w-full flex items-center justify-between px-10 mt-4 relative z-50 ">
         <span className="text-xs text-gray-400 font-medium">
-          막차 카운트다운이 끝났습니다
+          막차를 놓쳐버린다면?
         </span>
         <button
           type="button"

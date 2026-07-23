@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Navbar from '../components/layouts/Navbar';
 import KakaoMap from '../components/layouts/KakaoMap';
 import CircularTimer from '../components/main/CircularTimer';
 import TransportModal from '../components/main/TransportModal';
 import AlarmModal from '../components/main/AlarmModal';
-import { MOCK_STATIONS } from '../mock/metroMockData'; // 🚨 Mock 데이터 임포트
+import { MOCK_STATIONS } from '../mock/metroMockData';
 import uil_exchange from '../assets/uil_exchange.svg';
 
 import audio30 from '../assets/audio/30m.mp3';
@@ -28,10 +28,9 @@ const Menu = () => {
   const [destination, setDestination] = useState('');
   const [searchedDestination, setSearchedDestination] = useState('');
   const [walkInfo, setWalkInfo] = useState(null);
-  const [mapCoords, setMapCoords] = useState({
-    origin: HONGIK_COORDS,
-    destination: '',
-  });
+
+  // 🚨 좌표 상태를 객체가 아닌 개별 원시값 또는 안정된 상태로 분리하여 불필요한 리렌더링 방지
+  const [destCoords, setDestCoords] = useState('');
 
   // 교통수단 모달
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -42,9 +41,8 @@ const Menu = () => {
   const triggeredRef = useRef(new Set());
   const audioRef = useRef(null);
 
-  // 🚨 [핵심] 사용자가 입력한 검색어와 일치하는 Mock 역의 ID를 찾아냄 (없으면 기본값 1번 상수역)
   const getSelectedStationId = () => {
-    if (!searchedDestination) return 1; // 검색 전 기본값
+    if (!searchedDestination) return 1;
 
     const found = MOCK_STATIONS.find(
       (station) =>
@@ -55,12 +53,10 @@ const Menu = () => {
     return found ? found.id : 1;
   };
 
-  // 🚨 현재 선택된 역의 상세 Mock 데이터 객체
   const currentStationData =
     MOCK_STATIONS.find((s) => s.id === getSelectedStationId()) ||
     MOCK_STATIONS[0];
 
-  // 막차 시간 계산
   const lastTrainTime = useMemo(() => {
     const t = new Date();
     const [h, m] = currentStationData.lastTrainTime.split(':').map(Number);
@@ -69,7 +65,6 @@ const Menu = () => {
     return t;
   }, [currentStationData]);
 
-  // 골든타임 = 막차시간 - 도보시간
   const goldenTime = useMemo(() => {
     const walkMins = walkInfo
       ? walkInfo.minutes
@@ -93,7 +88,6 @@ const Menu = () => {
     return Math.floor((firstTrain - lastTrainTime) / 60000);
   }, [lastTrainTime]);
 
-  /* ── 알람 열기 (오디오 재생 포함) ── */
   const openAlarm = (stageMin) => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -112,7 +106,6 @@ const Menu = () => {
     }
   };
 
-  /* ── 알람 닫기 (오디오 정지) ── */
   const closeAlarm = () => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -122,7 +115,6 @@ const Menu = () => {
     setAlarmOpen(false);
   };
 
-  /* ── 자동 트리거 ── */
   useEffect(() => {
     if (!goldenTime) return;
 
@@ -145,12 +137,10 @@ const Menu = () => {
     return () => clearInterval(interval);
   }, [goldenTime]);
 
-  // 도착지 바뀌면 트리거 기록 초기화
   useEffect(() => {
     triggeredRef.current.clear();
   }, [searchedDestination]);
 
-  // 컴포넌트 언마운트 시 오디오 정리
   useEffect(() => {
     return () => {
       if (audioRef.current) {
@@ -168,6 +158,15 @@ const Menu = () => {
   const handleOtherWaysClick = () => {
     setIsModalOpen(true);
   };
+
+  // 🚨 좌표 변경 핸들러를 useCallback으로 고정하여 자식 컴포넌트의 무한 렌더링 차단
+  const handleCoordsChange = useCallback((coords) => {
+    if (coords && coords.destination) {
+      setDestCoords((prev) =>
+        prev === coords.destination ? prev : coords.destination
+      );
+    }
+  }, []);
 
   return (
     <div className="min-h-screen text-white flex flex-col pt-0 pb-24 relative overflow-x-hidden gap-4">
@@ -218,19 +217,6 @@ const Menu = () => {
         타이머는 30분, 15분, 5분 전, 정각에 울립니다
       </p>
 
-      {/* 🧪 발표용 테스트 버튼 (배포 전 삭제 가능) */}
-      <div className="flex justify-center items-center gap-3 my-2">
-        {[30, 15, 5, 0].map((min) => (
-          <button
-            key={min}
-            onClick={() => openAlarm(min)}
-            className="text-white text-xs px-3 py-1.5 bg-gray-800 rounded-full hover:bg-gray-700 transition font-bold border border-white/10 cursor-pointer"
-          >
-            {min === 0 ? '정각' : `${min}분전`}
-          </button>
-        ))}
-      </div>
-
       {/* 3. 원형 타이머 */}
       <div className="flex justify-center items-center my-2">
         <CircularTimer
@@ -239,45 +225,12 @@ const Menu = () => {
         />
       </div>
 
-      {/* 🚨 선택된 역의 막차 정보 & 도보 시간 안내 카드 */}
-      <div className="mx-4 bg-[#2A2D35] border border-white/10 rounded-[16px] p-4 flex flex-col gap-2 shadow-md">
-        <div className="flex justify-between items-center">
-          <span className="text-xs text-gray-400 font-medium">
-            선택된 노선 정보
-          </span>
-          <span className="text-xs font-bold text-[#00E676] bg-[#00E676]/10 px-2 py-0.5 rounded">
-            {currentStationData.line}
-          </span>
-        </div>
-
-        <div className="flex justify-between items-end">
-          <div className="flex flex-col">
-            <span className="text-sm font-bold text-white">
-              {currentStationData.name} 행 막차
-            </span>
-            <span className="text-[11px] text-gray-400 mt-0.5">
-              탑승 역:{' '}
-              <strong className="text-white">
-                {currentStationData.departureStation}
-              </strong>{' '}
-              (도보 {currentStationData.walkingTime}분 소요)
-            </span>
-          </div>
-          <div className="text-right">
-            <span className="text-xs text-gray-400 block">막차 시각</span>
-            <span className="text-sm font-extrabold text-[#FF2B2B]">
-              {currentStationData.lastTrainTime.slice(0, 5)}
-            </span>
-          </div>
-        </div>
-      </div>
-
       {/* 4. 교통수단 모달 */}
       {isModalOpen && (
         <TransportModal
           onClose={() => setIsModalOpen(false)}
-          originCoords={mapCoords.origin}
-          destCoords={mapCoords.destination}
+          originCoords={HONGIK_COORDS}
+          destCoords={destCoords}
         />
       )}
 
@@ -299,12 +252,7 @@ const Menu = () => {
             destination={searchedDestination}
             origin={HONGIK_COORDS}
             onWalkingTime={(min, m) => setWalkInfo({ minutes: min, meters: m })}
-            onCoordsChange={(coords) => {
-              setMapCoords({
-                origin: coords.origin || HONGIK_COORDS,
-                destination: coords.destination,
-              });
-            }}
+            onCoordsChange={handleCoordsChange}
           />
 
           {walkInfo && (
@@ -324,4 +272,4 @@ const Menu = () => {
   );
 };
 
-export default Menu; // 혹은 export default Menu;
+export default Menu;
