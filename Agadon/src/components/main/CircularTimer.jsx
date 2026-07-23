@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import api from '../../api/axiosInstance';
+import React, { useState, useEffect, useRef } from 'react';
+// 🚨 아까 만든 Mock 데이터를 임포트합니다. (경로는 프로젝트에 맞게 수정해주세요)
+import { MOCK_STATIONS } from '../../mock/metroMockData';
 
-//  24시 이상(24:13) 및 일반 시간 문자열을 정확한 Date 객체로 변환하는 유틸 함수
+// 24시 이상 및 일반 시간 문자열을 정확한 Date 객체로 변환하는 함수
 const parseDepartTime = (timeStr) => {
   let [h, m, s = 0] = timeStr.split(':').map(Number);
 
@@ -11,7 +12,6 @@ const parseDepartTime = (timeStr) => {
   const target = new Date();
   target.setHours(h, m, s, 0);
 
-  // 24시 넘어가거나, 새벽 시각(0~4시)인데 현재가 밤(12시 이후)이면 다음 날로 설정
   const nowHours = new Date().getHours();
   if (isNextDay || (h < 5 && nowHours >= 12)) {
     target.setDate(target.getDate() + 1);
@@ -20,81 +20,86 @@ const parseDepartTime = (timeStr) => {
   return target;
 };
 
-export default function CircularTimer({ onOtherWaysClick }) {
+// 시간을 AM/PM 포맷으로 예쁘게 바꿔주는 헬퍼 함수
+const formatAmPm = (dateObj) => {
+  let h = dateObj.getHours();
+  const m = String(dateObj.getMinutes()).padStart(2, '0');
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12; // 0시는 12시로 표기
+  return `${ampm} ${h}:${m}`;
+};
+
+export default function CircularTimer({
+  selectedStationId = 1, // 테스트용 (1:상수역, 2:강남역 등)
+  onOtherWaysClick = () => {},
+  onAlarmTrigger = () => {}, // 알람 모달용
+}) {
   const [timeLeft, setTimeLeft] = useState(null); // 남은 초
   const [totalSeconds, setTotalSeconds] = useState(3600);
   const [lastTrainInfo, setLastTrainInfo] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
-  // 1. API 호출 및 계산
-  const fetchLastTrain = async () => {
-    try {
-      setLoading(true);
-      setError('');
+  // 🚨 [핵심] '진짜 출발해야 하는 시각(막차시간 - 도보시간)'을 저장할 Ref
+  const targetTimeRef = useRef(null);
 
-      const response = await api.get('/api/metro/last-train', {
-        params: { station: '100', weekTag: 1, inoutTag: 1 },
-      });
+  // 1. Mock 데이터 계산 로직
+  const fetchMockData = () => {
+    setLoading(true);
 
-      const data = response.data;
+    // 선택된 역 정보 가져오기 (기본값: 상수역)
+    const stationData =
+      MOCK_STATIONS.find((s) => s.id === selectedStationId) || MOCK_STATIONS[0];
 
-      if (data && data.lastTrains && data.lastTrains.length > 0) {
-        //'00:00:00' 제외하고 실제 운행하는 막차들만 추출
-        const validTrains = data.lastTrains.filter(
-          (train) => train.departTime && train.departTime !== '00:00:00'
-        );
+    // 1) 지하철역에서 막차가 떠나는 실제 시간
+    const trainDepartTime = parseDepartTime(stationData.lastTrainTime);
 
-        // 가장 마지막 막차 선택 (없으면 첫 번째 항목)
-        const targetTrain =
-          validTrains.length > 0
-            ? validTrains[validTrains.length - 1]
-            : data.lastTrains[0];
+    // 2) 🚨 찐 골든타임 계산 (막차시간 - 도보시간)
+    const walkMilliseconds = stationData.walkingTime * 60 * 1000;
+    const mustLeaveTime = new Date(
+      trainDepartTime.getTime() - walkMilliseconds
+    );
 
-        setLastTrainInfo({
-          stationName: data.stationName,
-          line: data.line,
-          departTime: targetTrain.departTime,
-          destination: targetTrain.destination,
-        });
+    // Ref에 저장해두고 매초 현재시간과 비교
+    targetTimeRef.current = mustLeaveTime;
 
-        // 24:13:00 대응 파싱 함수 적용
-        const now = new Date();
-        const targetTime = parseDepartTime(targetTrain.departTime);
-        const diffInSeconds = Math.floor((targetTime - now) / 1000);
+    setLastTrainInfo({
+      departureStation: stationData.departureStation, // 홍대입구역 or 상수역
+      walkingTime: stationData.walkingTime,
+      trainTime: stationData.lastTrainTime,
+      leaveTimeFormatted: formatAmPm(mustLeaveTime), // 예: PM 11:42
+    });
 
-        setTimeLeft(diffInSeconds);
-        setTotalSeconds(diffInSeconds > 3600 ? diffInSeconds : 3600);
-      } else {
-        setError('막차 운행 정보가 없습니다.');
-        setTimeLeft(3600);
-      }
-    } catch (err) {
-      console.error('막차 정보 조회 실패:', err);
-      setError('막차 정보를 불러오지 못했습니다.');
+    const now = new Date();
+    const diffInSeconds = Math.floor((mustLeaveTime - now) / 1000);
 
-      // API 실패 시 기본 시간 설정
-      setTimeLeft(2850);
-      setLastTrainInfo({ departTime: '23:45:00', destination: '성수' });
-    } finally {
-      setLoading(false);
-    }
+    setTimeLeft(diffInSeconds);
+    setTotalSeconds(diffInSeconds > 3600 ? diffInSeconds : 3600);
+    setLoading(false);
   };
 
   useEffect(() => {
-    fetchLastTrain();
-  }, []);
+    fetchMockData();
+  }, [selectedStationId]);
 
-  // 2. 1초마다 카운트다운
+  // 2. 🚨 실시간 카운트다운 (새로고침/백그라운드 방어 로직)
   useEffect(() => {
-    if (timeLeft === null) return;
+    if (!targetTimeRef.current) return;
 
     const timer = setInterval(() => {
-      setTimeLeft((prev) => prev - 1);
+      const now = new Date();
+      // 단순히 -1을 하는게 아니라, 목표시각과 현재시각의 찐 차이를 매초 구함
+      const diffInSeconds = Math.floor((targetTimeRef.current - now) / 1000);
+
+      // 알람 트리거 (30분, 15분, 5분, 정각)
+      if ([1800, 900, 300, 0].includes(diffInSeconds)) {
+        onAlarmTrigger(diffInSeconds);
+      }
+
+      setTimeLeft(diffInSeconds);
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [timeLeft]);
+  }, [onAlarmTrigger]);
 
   // 상태 판단 (막차 지남 여부 및 경고)
   const isExpired = timeLeft !== null && timeLeft <= 0;
@@ -115,12 +120,10 @@ export default function CircularTimer({ onOtherWaysClick }) {
       : 0;
   const strokeDashoffset = circumference - progress * circumference;
 
-  // 게이지 끝 노브(Knob) 좌표
   const angle = (1 - progress) * 360 - 90;
   const knobX = center + radius * Math.cos((angle * Math.PI) / 180);
   const knobY = center + radius * Math.sin((angle * Math.PI) / 180);
 
-  // 시:분 / 초 포맷팅 (경과 시 +01:30 형태)
   const formatTime = (seconds) => {
     if (seconds === null) return '00:00';
     const absSecs = Math.abs(seconds);
@@ -133,7 +136,7 @@ export default function CircularTimer({ onOtherWaysClick }) {
   if (loading) {
     return (
       <div className="py-12 text-center text-gray-400 text-xs">
-        막차 시간을 계산 중입니다...
+        도보 시간을 반영하여 골든타임을 계산 중입니다...
       </div>
     );
   }
@@ -141,7 +144,7 @@ export default function CircularTimer({ onOtherWaysClick }) {
   return (
     <div className="flex flex-col items-center justify-center w-full">
       {/* 1. 원형 타이머 SVG */}
-      <div className="relative flex items-center justify-center">
+      <div className="relative flex items-center justify-center relative z-10">
         <svg width={size} height={size} className="rotate-[-90deg]">
           <circle
             cx={center}
@@ -160,9 +163,7 @@ export default function CircularTimer({ onOtherWaysClick }) {
             strokeDasharray={circumference}
             strokeDashoffset={strokeDashoffset}
             strokeLinecap="round"
-            className={`transition-all duration-1000 ease-linear ${
-              isWarning ? 'stroke-[#FF2B2B]' : 'stroke-green-15'
-            }`}
+            className={`transition-all duration-1000 ease-linear ${isWarning ? 'stroke-[#FF2B2B]' : 'stroke-green-15'}`}
           />
         </svg>
 
@@ -178,20 +179,14 @@ export default function CircularTimer({ onOtherWaysClick }) {
 
         {/* 원 중앙 텍스트 */}
         <div className="absolute flex flex-col items-center justify-center text-center">
-          {/* 타이머 숫자 (+01:30 or 47:30) */}
           <span
-            className={`text-5xl font-extrabold tracking-wider mb-2 ${
-              isExpired ? 'text-[#FF2B2B]' : 'text-white'
-            }`}
+            className={`text-5xl font-extrabold tracking-wider mb-1 ${isExpired ? 'text-[#FF2B2B]' : 'text-white'}`}
           >
             {formatTime(timeLeft)}
           </span>
 
-          {/* 상태 문구 */}
           <span
-            className={`text-base font-bold whitespace-pre-line ${
-              isWarning ? 'text-[#FF2B2B]' : 'text-green-15'
-            }`}
+            className={`text-base font-bold whitespace-pre-line ${isWarning ? 'text-[#FF2B2B]' : 'text-green-15'}`}
           >
             {isExpired
               ? '골든 타임\n경과'
@@ -200,25 +195,30 @@ export default function CircularTimer({ onOtherWaysClick }) {
                 : '골든 타임'}
           </span>
 
-          {/* 출발 시간 */}
+          {/* 🚨 도보 시간 및 탑승역 안내 텍스트 추가 */}
           {lastTrainInfo && !isExpired && (
-            <span className="text-xs text-gray-400 mt-1">
-              PM {lastTrainInfo.departTime.slice(0, 5)} 출발
-            </span>
+            <div className="flex flex-col items-center mt-2 text-gray-400">
+              <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-sm mb-1">
+                {lastTrainInfo.departureStation}까지 도보{' '}
+                {lastTrainInfo.walkingTime}분
+              </span>
+              <span className="text-xs font-semibold text-white">
+                {lastTrainInfo.leaveTimeFormatted} 에 출발하세요!
+              </span>
+            </div>
           )}
         </div>
       </div>
 
-      {/* 2. 막차 종료 시 피그마 하단: [다른 방법 보기] 버튼 */}
-
-      <div className="w-full flex items-center justify-between px-2 mt-4">
+      {/* 2. [다른 방법 보기] 버튼 */}
+      <div className="w-full flex items-center justify-between px-2 mt-4 relative z-50">
         <span className="text-xs text-gray-400 font-medium">
           막차 카운트다운이 끝났습니다
         </span>
         <button
           type="button"
           onClick={onOtherWaysClick}
-          className="px-4 py-2 bg-[#FF2B2B]/20 text-[#FF2B2B] hover:bg-[#FF2B2B]/30 font-bold text-xs rounded-full border border-[#FF2B2B]/40 transition cursor-pointer"
+          className="px-4 py-2 bg-[#FF2B2B]/20 text-[#FF2B2B] hover:bg-[#FF2B2B]/30 font-bold text-xs rounded-full border border-[#FF2B2B]/40 transition cursor-pointer relative z-50"
         >
           다른 방법 보기
         </button>
