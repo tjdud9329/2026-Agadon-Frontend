@@ -4,7 +4,13 @@ import Start from './pages/Start';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import NotFound from './pages/NotFound';
+import MyTransportation from './pages/MyTransportation';
+import MyPage from './pages/MyPage';
 import { Layout } from './components/layouts/Layout';
+import {
+  ProtectedRoute,
+  PublicOnlyRoute,
+} from './components/routes/AuthRoutes';
 
 function App() {
   return (
@@ -14,13 +20,21 @@ function App() {
         <div className="relative bg-bg w-full max-w-[390px] min-h-screen bg-white shadow-2xl flex flex-col overflow-x-hidden">
           <Routes>
             {/*Navbar가 보이는 모바일 레이아웃 페이지*/}
-            <Route element={<Layout />}>
-              <Route path="/Menu" element={<Menu />} />
+            <Route element={<ProtectedRoute />}>
+              <Route element={<Layout />}>
+                <Route path="/Menu" element={<Menu />} />
+                <Route
+                  path="/MyTransportation"
+                  element={<MyTransportation />}
+                />
+                <Route path="/Mypage" element={<MyPage />} />
+              </Route>
             </Route>
-
-            <Route path="/" element={<Start />} />
-            <Route path="/Login" element={<Login />} />
-            <Route path="/SignUp" element={<Signup />} />
+            <Route element={<PublicOnlyRoute />}>
+              <Route path="/" element={<Start />} />
+              <Route path="/Login" element={<Login />} />
+              <Route path="/SignUp" element={<Signup />} />
+            </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
         </div>
