@@ -1,14 +1,14 @@
 import { Navigate, Outlet } from 'react-router-dom';
 
-const hasAccessToken = () => Boolean(localStorage.getItem('accessToken'));
-
 /**
  * 1. 로그인 전용 라우트 (Protected Route)
  * - 로그인 안 한 유저가 접근 시: /Login 으로 이동
  */
 export const ProtectedRoute = () => {
-  if (!hasAccessToken()) {
-    localStorage.removeItem('isLoggedIn');
+  const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+
+  if (!isLoggedIn) {
+    alert('로그인이 필요한 서비스입니다.');
     return <Navigate to="/Login" replace />;
   }
 
@@ -20,10 +20,11 @@ export const ProtectedRoute = () => {
  * - 이미 로그인한 유저가 Start, Login, Signup 접근 시: /Menu 로 이동
  */
 export const PublicOnlyRoute = () => {
-  if (hasAccessToken()) {
+  const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+
+  if (isLoggedIn) {
     return <Navigate to="/Menu" replace />;
   }
 
-  localStorage.removeItem('isLoggedIn');
   return <Outlet />;
 };

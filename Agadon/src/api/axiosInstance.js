@@ -29,12 +29,7 @@ axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('isLoggedIn');
-
-      if (window.location.pathname.toLowerCase() !== '/login') {
-        window.location.replace('/Login');
-      }
+      // 토큰 만료 시 처리 (로그인 페이지 이동 등)
     }
     return Promise.reject(error);
   }

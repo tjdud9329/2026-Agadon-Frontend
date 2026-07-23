@@ -30,28 +30,27 @@ export default function LoginPage({ onLoginSuccess }) {
       const token =
         response.data.accessToken || response.data.data?.accessToken;
 
-      if (!token) {
-        throw new Error('로그인 응답에 액세스 토큰이 없습니다.');
-      }
+      if (token) {
+        // 로컬스토리지 저장
+        localStorage.setItem('accessToken', token);
+        localStorage.setItem('isLoggedIn', 'true');
 
-      // 로컬스토리지 저장
-      localStorage.setItem('accessToken', token);
-      localStorage.setItem('isLoggedIn', 'true');
-
-      // 내 정보 조회
-      try {
-        const meResponse = await api.get('/api/v1/users/me');
-        console.log('로그인 직후 내 정보 응답:', meResponse.data);
-      } catch (meError) {
-        if (meError.response?.status === 401) {
-          throw meError;
+        // 내 정보 조회
+        try {
+          const meResponse = await api.get('/api/v1/users/me', {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          console.log('로그인 직후 내 정보 응답:', meResponse.data);
+        } catch (meError) {
+          console.error('내 정보 가져오기 실패:', meError);
         }
-        console.error('내 정보 가져오기 실패:', meError);
-      }
 
-      // 콜백 함수 실행
-      if (typeof onLoginSuccess === 'function') {
-        await onLoginSuccess(token);
+        // 콜백 함수 실행
+        if (typeof onLoginSuccess === 'function') {
+          await onLoginSuccess(token);
+        }
       }
 
       alert('로그인 성공!');
@@ -60,7 +59,6 @@ export default function LoginPage({ onLoginSuccess }) {
       console.error('로그인 실패:', error);
       alert(
         error.response?.data?.message ||
-          error.message ||
           '이메일 또는 비밀번호가 올바르지 않습니다.'
       );
       setPassword(''); // 틀렸을 때 비밀번호 칸만 비우기
