@@ -49,7 +49,7 @@ const Navbar = () => {
 
           return (
             <Link
-              key={item.path}
+              key={item.icon}
               to={item.path}
               className={`flex flex-col items-center justify-center w-16 h-full gap-1 transition-all ${
                 isActive ? 'text-red-05 font-bold scale-105' : 'text-gray-40'

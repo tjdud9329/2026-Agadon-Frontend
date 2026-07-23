@@ -1,70 +1,81 @@
 import React, { useState, useEffect } from 'react';
-import api from '../../api/axiosInstance'; // 설정해두신 axios 인스턴스
+import api from '../../api/axiosInstance';
 
-export default function TimerPage() {
+// 🛠️ 1. 24시 이상(24:13) 및 일반 시간 문자열을 정확한 Date 객체로 변환하는 유틸 함수
+const parseDepartTime = (timeStr) => {
+  let [h, m, s = 0] = timeStr.split(':').map(Number);
+
+  const isNextDay = h >= 24;
+  if (isNextDay) h -= 24;
+
+  const target = new Date();
+  target.setHours(h, m, s, 0);
+
+  // 24시 넘어가거나, 새벽 시각(0~4시)인데 현재가 밤(12시 이후)이면 다음 날로 설정
+  const nowHours = new Date().getHours();
+  if (isNextDay || (h < 5 && nowHours >= 12)) {
+    target.setDate(target.getDate() + 1);
+  }
+
+  return target;
+};
+
+export default function CircularTimer({ onOtherWaysClick = () => {} }) {
   const [timeLeft, setTimeLeft] = useState(null); // 남은 초
-  const [totalSeconds, setTotalSeconds] = useState(3600); // 전체 게이지 기준 (기본 1시간)
-  const [lastTrainInfo, setLastTrainInfo] = useState(null); // 막차 정보
+  const [totalSeconds, setTotalSeconds] = useState(3600);
+  const [lastTrainInfo, setLastTrainInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // 1. API 호출 및 남은 시간(초) 계산 함수
+  // 1. API 호출 및 계산
   const fetchLastTrain = async () => {
     try {
       setLoading(true);
       setError('');
 
-      // 📌 파라미터 값 설정 (예: 홍대입구 '0239', 평일 1, 상행 1)
       const response = await api.get('/api/metro/last-train', {
-        params: {
-          station: '0239', // 역 외부코드
-          weekTag: 1, // 1: 평일, 2: 토요일, 3: 일요일/공휴일
-          inoutTag: 1, // 1: 상행/내선, 2: 하행/외선
-        },
+        params: { station: '100', weekTag: 1, inoutTag: 1 },
       });
 
       const data = response.data;
-      console.log('막차 조회 응답:', data);
 
       if (data && data.lastTrains && data.lastTrains.length > 0) {
-        // 첫 번째 막차 정보 추출
-        const targetTrain = data.lastTrains[0];
+        //'00:00:00' 제외하고 실제 운행하는 막차들만 추출
+        const validTrains = data.lastTrains.filter(
+          (train) => train.departTime && train.departTime !== '00:00:00'
+        );
+
+        // 가장 마지막 막차 선택 (없으면 첫 번째 항목)
+        const targetTrain =
+          validTrains.length > 0
+            ? validTrains[validTrains.length - 1]
+            : data.lastTrains[0];
+
         setLastTrainInfo({
-          stationName: data.stationName, //역 이름
-          line: data.line, //호선
-          departTime: targetTrain.departTime, // 도착시간
-          destination: targetTrain.destination, //목적지
+          stationName: data.stationName,
+          line: data.line,
+          departTime: targetTrain.departTime,
+          destination: targetTrain.destination,
         });
 
-        // ⏱️ 남은 초 계산 로직
+        // 24:13:00 대응 파싱 함수 적용
         const now = new Date();
-        const [hours, minutes, seconds = 0] = targetTrain.departTime
-          .split(':')
-          .map(Number);
-
-        const targetTime = new Date();
-        targetTime.setHours(hours, minutes, seconds, 0);
-
-        // 막차 시간이 새벽(00시, 01시 등)인데 현재 시각이 밤(23시 등)이면 다음날 새벽으로 설정
-        if (hours < 5 && now.getHours() >= 12) {
-          targetTime.setDate(targetTime.getDate() + 1);
-        }
-
+        const targetTime = parseDepartTime(targetTrain.departTime);
         const diffInSeconds = Math.floor((targetTime - now) / 1000);
 
-        if (diffInSeconds > 0) {
-          setTimeLeft(diffInSeconds);
-          // 전체 게이지 기준값 설정 (막차가 1시간 이상 남았으면 그 값으로, 아니면 1시간 기준)
-          setTotalSeconds(diffInSeconds > 3600 ? diffInSeconds : 3600);
-        } else {
-          setTimeLeft(0); // 이미 막차가 지난 경우
-        }
+        setTimeLeft(diffInSeconds);
+        setTotalSeconds(diffInSeconds > 3600 ? diffInSeconds : 3600);
       } else {
         setError('막차 운행 정보가 없습니다.');
+        setTimeLeft(3600);
       }
     } catch (err) {
       console.error('막차 정보 조회 실패:', err);
       setError('막차 정보를 불러오지 못했습니다.');
+
+      // API 실패 시 기본 시간 설정
+      setTimeLeft(2850);
+      setLastTrainInfo({ departTime: '23:45:00', destination: '성수' });
     } finally {
       setLoading(false);
     }
@@ -74,65 +85,72 @@ export default function TimerPage() {
     fetchLastTrain();
   }, []);
 
-  // 2. 1초마다 타이머 카운트다운
+  // 2. 1초마다 카운트다운
   useEffect(() => {
-    if (timeLeft === null || timeLeft <= 0) return;
+    if (timeLeft === null) return;
 
     const timer = setInterval(() => {
-      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+      setTimeLeft((prev) => prev - 1);
     }, 1000);
 
     return () => clearInterval(timer);
   }, [timeLeft]);
 
-  // SVG 원 및 게이지 설정
-  const size = 300;
+  // 상태 판단 (막차 지남 여부 및 경고)
+  const isExpired = timeLeft !== null && timeLeft <= 0;
+  const isWarning = isExpired || (timeLeft !== null && timeLeft <= 1200);
+
+  // SVG 원 설정
+  const size = 290;
   const strokeWidth = 10;
   const center = size / 2;
   const radius = center - strokeWidth - 10;
   const circumference = 2 * Math.PI * radius;
 
-  // 타이머 진행률 및 20분(1200초) 이하 경고 조건
-  const progress = timeLeft && totalSeconds ? timeLeft / totalSeconds : 0;
+  // 게이지 진행률 계산
+  const progress = isExpired
+    ? 1
+    : timeLeft && totalSeconds
+      ? timeLeft / totalSeconds
+      : 0;
   const strokeDashoffset = circumference - progress * circumference;
-  const isWarning = timeLeft !== null && timeLeft <= 1200;
 
-  // 게이지 끝 노브(Knob) 좌표 계산
+  // 게이지 끝 노브(Knob) 좌표
   const angle = (1 - progress) * 360 - 90;
   const knobX = center + radius * Math.cos((angle * Math.PI) / 180);
   const knobY = center + radius * Math.sin((angle * Math.PI) / 180);
 
-  // 시:분:초 포맷팅
+  // 시:분 / 초 포맷팅 (경과 시 +01:30 형태)
   const formatTime = (seconds) => {
-    if (seconds === null || seconds < 0) return '00:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    if (seconds === null) return '00:00';
+    const absSecs = Math.abs(seconds);
+    const mins = Math.floor(absSecs / 60);
+    const secs = absSecs % 60;
+    const timeStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    return seconds < 0 ? `+${timeStr}` : timeStr;
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-bg text-txt flex items-center justify-center">
+      <div className="py-12 text-center text-gray-400 text-xs">
         막차 시간을 계산 중입니다...
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-bg text-txt flex flex-col justify-center items-center px-4 py-8">
-      {/* 1. 동그란 원형 타이머 UI */}
+    <div className="flex flex-col items-center justify-center w-full">
+      {/* 1. 원형 타이머 SVG */}
       <div className="relative flex items-center justify-center">
         <svg width={size} height={size} className="rotate-[-90deg]">
-          {/* 배경 트랙 */}
           <circle
             cx={center}
             cy={center}
             r={radius}
-            className="stroke-gray-60/40"
+            className="stroke-gray-700/50"
             strokeWidth={strokeWidth}
             fill="transparent"
           />
-          {/* 프로그래스 트랙 (Tailwind 커스텀 색상 클래스 적용) */}
           <circle
             cx={center}
             cy={center}
@@ -143,64 +161,68 @@ export default function TimerPage() {
             strokeDashoffset={strokeDashoffset}
             strokeLinecap="round"
             className={`transition-all duration-1000 ease-linear ${
-              isWarning ? 'stroke-red-05' : 'stroke-green-15'
+              isWarning ? 'stroke-[#FF2B2B]' : 'stroke-green-15'
             }`}
           />
         </svg>
 
-        {/* 게이지 끝 노브(Dot) */}
-        {timeLeft > 0 && (
-          <div
-            className="absolute w-5 h-5 bg-gray-20 rounded-full shadow-md transition-all duration-1000 ease-linear"
-            style={{
-              left: `${knobX}px`,
-              top: `${knobY}px`,
-              transform: 'translate(-50%, -50%)',
-            }}
-          />
-        )}
+        {/* 게이지 끝 노브 */}
+        <div
+          className="absolute w-5 h-5 bg-white rounded-full shadow-md transition-all duration-1000 ease-linear"
+          style={{
+            left: `${knobX}px`,
+            top: `${knobY}px`,
+            transform: 'translate(-50%, -50%)',
+          }}
+        />
 
-        {/* 원 중앙 정보 */}
+        {/* 원 중앙 텍스트 */}
         <div className="absolute flex flex-col items-center justify-center text-center">
-          {/* 남은 시간 */}
-          <span className="text-5xl font-extrabold text-white tracking-wider mb-2">
+          {/* 타이머 숫자 (+01:30 or 47:30) */}
+          <span
+            className={`text-5xl font-extrabold tracking-wider mb-2 ${
+              isExpired ? 'text-[#FF2B2B]' : 'text-white'
+            }`}
+          >
             {formatTime(timeLeft)}
           </span>
 
-          {/* 상태 문구 (20분 미만 시 변경) */}
+          {/* 상태 문구 */}
           <span
-            className={`text-base font-bold transition-colors ${
-              isWarning ? 'text-red-05' : 'text-green-15'
+            className={`text-base font-bold whitespace-pre-line ${
+              isWarning ? 'text-[#FF2B2B]' : 'text-green-15'
             }`}
           >
-            {isWarning ? '막차 임박!' : '골든 타임'}
+            {isExpired
+              ? '골든 타임\n경과'
+              : isWarning
+                ? '막차 임박!'
+                : '골든 타임'}
           </span>
 
-          {/* API로 받아온 출발 시각 (예: PM 11:45) */}
-          {lastTrainInfo && (
-            <span
-              className={`text-sm font-medium mt-1 transition-colors ${
-                isWarning ? 'text-red-05/80' : 'text-green-15/80'
-              }`}
-            >
-              {lastTrainInfo.departTime.slice(0, 5)} 출발 (
-              {lastTrainInfo.destination}행)
+          {/* 출발 시간 */}
+          {lastTrainInfo && !isExpired && (
+            <span className="text-xs text-gray-400 mt-1">
+              PM {lastTrainInfo.departTime.slice(0, 5)} 출발
             </span>
           )}
         </div>
       </div>
 
-      {/* 에러 메시지 표시 */}
-      {error && <p className="text-red-05 text-sm mt-4">{error}</p>}
+      {/* 2. 막차 종료 시 피그마 하단: [다른 방법 보기] 버튼 */}
 
-      {/* 새로고침 버튼 */}
-      <button
-        type="button"
-        onClick={fetchLastTrain}
-        className="mt-8 px-6 py-3 rounded-[20px] bg-gray-60/30 text-white font-medium hover:bg-gray-60/50 transition cursor-pointer"
-      >
-        막차 시간 다시 조회
-      </button>
+      <div className="w-full flex items-center justify-between px-2 mt-4">
+        <span className="text-xs text-gray-400 font-medium">
+          막차 카운트다운이 끝났습니다
+        </span>
+        <button
+          type="button"
+          onClick={onOtherWaysClick}
+          className="px-4 py-2 bg-[#FF2B2B]/20 text-[#FF2B2B] hover:bg-[#FF2B2B]/30 font-bold text-xs rounded-full border border-[#FF2B2B]/40 transition cursor-pointer"
+        >
+          다른 방법 보기
+        </button>
+      </div>
     </div>
   );
 }
