@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api/axiosInstance';
 
-// 🛠️ 1. 24시 이상(24:13) 및 일반 시간 문자열을 정확한 Date 객체로 변환하는 유틸 함수
+//  24시 이상(24:13) 및 일반 시간 문자열을 정확한 Date 객체로 변환하는 유틸 함수
 const parseDepartTime = (timeStr) => {
   let [h, m, s = 0] = timeStr.split(':').map(Number);
 
@@ -20,7 +20,7 @@ const parseDepartTime = (timeStr) => {
   return target;
 };
 
-export default function CircularTimer({ onOtherWaysClick = () => {} }) {
+export default function CircularTimer({ onOtherWaysClick }) {
   const [timeLeft, setTimeLeft] = useState(null); // 남은 초
   const [totalSeconds, setTotalSeconds] = useState(3600);
   const [lastTrainInfo, setLastTrainInfo] = useState(null);
