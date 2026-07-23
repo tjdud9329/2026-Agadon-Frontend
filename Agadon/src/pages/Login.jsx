@@ -73,29 +73,6 @@ export default function LoginPage({ onLoginSuccess }) {
           </button>
         </form>
 
-        {/* 구분선 */}
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-slate-700" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-slate-800 px-3 text-slate-400">
-              간편 로그인
-            </span>
-          </div>
-        </div>
-
-        {/* 소셜 / 학교 계정 버튼 */}
-        <div className="space-y-3">
-          <button
-            type="button"
-            onClick={() => alert('카카오 로그인 연동')}
-            className="w-full py-3 px-4 rounded-xl bg-[#FEE500] hover:bg-[#fdd800] text-[#191919] font-semibold text-sm flex items-center justify-center gap-2 transition"
-          >
-            <span className="font-extrabold text-xs">💬</span> 카카오로 시작하기
-          </button>
-        </div>
-
         {/* 회원가입 안내 */}
         <p className="mt-6 text-center text-xs text-slate-400">
           아직 계정이 없으신가요?{' '}
