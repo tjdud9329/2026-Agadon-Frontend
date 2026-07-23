@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import axiosInstance from '../../api/axiosInstance';
 
 // 🚨 홍익대학교 정문 고정 좌표 상수 (위도, 경도)
 const HONGIK_LAT = 37.5515;
@@ -44,7 +43,7 @@ const KakaoMap = ({ destination, origin, onCoordsChange, onError }) => {
     const kakao = window.kakao;
     const ps = new kakao.maps.services.Places();
 
-    ps.keywordSearch(destination, async (result, status) => {
+    ps.keywordSearch(destination, (result, status) => {
       if (status !== kakao.maps.services.Status.OK || !result[0]) {
         onError?.('검색한 목적지의 좌표를 찾지 못했습니다.');
         return;
@@ -69,58 +68,33 @@ const KakaoMap = ({ destination, origin, onCoordsChange, onError }) => {
         });
       }
 
-      try {
-        const response = await axiosInstance.post('/api/directions', {
-          origin: originCoords,
-          destination: `${destLng},${destLat}`,
-        });
+      // 지도 표시를 위해 카카오 길찾기 API를 중복 호출하지 않는다.
+      // 실제 교통 경로와 택시 정보는 Trip API 응답을 사용한다.
+      if (endMarkerRef.current) endMarkerRef.current.setMap(null);
+      if (polylineRef.current) polylineRef.current.setMap(null);
 
-        // 기존 마커 및 선 지우기
-        if (endMarkerRef.current) endMarkerRef.current.setMap(null);
-        if (polylineRef.current) polylineRef.current.setMap(null);
+      const startPosition = new kakao.maps.LatLng(HONGIK_LAT, HONGIK_LNG);
+      const destinationPosition = new kakao.maps.LatLng(destLat, destLng);
 
-        // 도착지 마커 표시
-        endMarkerRef.current = new kakao.maps.Marker({
-          map: mapInstance.current,
-          position: new kakao.maps.LatLng(destLat, destLng),
-          title: '목적지',
-        });
+      endMarkerRef.current = new kakao.maps.Marker({
+        map: mapInstance.current,
+        position: destinationPosition,
+        title: '목적지',
+      });
 
-        const route = response.data.routes[0];
-        const path = [];
+      polylineRef.current = new kakao.maps.Polyline({
+        map: mapInstance.current,
+        path: [startPosition, destinationPosition],
+        strokeWeight: 4,
+        strokeColor: '#3A7AFE',
+        strokeOpacity: 0.65,
+        strokeStyle: 'shortdash',
+      });
 
-        // 경로 좌표 파싱
-        route.sections.forEach((section) => {
-          section.roads.forEach((road) => {
-            const vertexes = road.vertexes;
-            for (let i = 0; i < vertexes.length; i += 2) {
-              path.push(new kakao.maps.LatLng(vertexes[i + 1], vertexes[i]));
-            }
-          });
-        });
-
-        // 경로 선 그리기
-        polylineRef.current = new kakao.maps.Polyline({
-          map: mapInstance.current,
-          path,
-          strokeWeight: 6,
-          strokeColor: '#3A7AFE',
-          strokeOpacity: 0.9,
-          strokeStyle: 'solid',
-        });
-
-        // 출발지~목적지 경로 전체가 지도에 보이도록 바운드 조절
-        const bounds = new kakao.maps.LatLngBounds();
-        bounds.extend(new kakao.maps.LatLng(HONGIK_LAT, HONGIK_LNG));
-        path.forEach((point) => bounds.extend(point));
-        mapInstance.current.setBounds(bounds);
-      } catch (err) {
-        console.error('길찾기 API 오류', err);
-        onError?.(
-          err.response?.data?.message ||
-            '지도 경로를 불러오지 못했지만 막차 정보는 계속 확인할 수 있습니다.'
-        );
-      }
+      const bounds = new kakao.maps.LatLngBounds();
+      bounds.extend(startPosition);
+      bounds.extend(destinationPosition);
+      mapInstance.current.setBounds(bounds);
     });
   }, [destination, origin, onCoordsChange, onError]);
 
