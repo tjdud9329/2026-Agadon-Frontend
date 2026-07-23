@@ -17,7 +17,7 @@ function App() {
     <BrowserRouter>
       <div className="min-h-screen bg-gray-200 flex justify-center">
         {/* 아이폰 13 기준 너비: 390px */}
-        <div className="relative bg-bg w-full max-w-[390px] min-h-screen bg-white shadow-2xl flex flex-col overflow-x-hidden">
+        <div className="relative bg-bg w-full max-w-[390px] min-h-screen  shadow-2xl flex flex-col overflow-x-hidden pt-0">
           <Routes>
             {/*Navbar가 보이는 모바일 레이아웃 페이지*/}
             <Route element={<ProtectedRoute />}>

@@ -1,10 +1,10 @@
 import { useEffect, useRef } from 'react';
 import axiosInstance from '../../api/axiosInstance';
 
-const KakaoMap = ({ destination }) => {
+const KakaoMap = ({ destination, onWalkingTime, onCoordsChange }) => {
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
-  const currentCoordsRef = useRef(null);  // 추가
+  const currentCoordsRef = useRef(null); // 추가
 
   const startMarkerRef = useRef(null);
   const endMarkerRef = useRef(null);
@@ -17,24 +17,39 @@ const KakaoMap = ({ destination }) => {
     kakao.maps.load(() => {
       navigator.geolocation.getCurrentPosition(
         ({ coords }) => {
-          currentCoordsRef.current = coords;  // 저장
-          const current = new kakao.maps.LatLng(coords.latitude, coords.longitude);
-          const map = new kakao.maps.Map(mapRef.current, { center: current, level: 4 });
+          currentCoordsRef.current = coords; // 저장
+          const current = new kakao.maps.LatLng(
+            coords.latitude,
+            coords.longitude
+          );
+          const map = new kakao.maps.Map(mapRef.current, {
+            center: current,
+            level: 4,
+          });
           mapInstance.current = map;
-          startMarkerRef.current = new kakao.maps.Marker({ map, position: current, title: '현재 위치' });
+          startMarkerRef.current = new kakao.maps.Marker({
+            map,
+            position: current,
+            title: '현재 위치',
+          });
         },
         () => {
           const center = new kakao.maps.LatLng(37.5571, 126.9237);
           const map = new kakao.maps.Map(mapRef.current, { center, level: 4 });
           mapInstance.current = map;
-          startMarkerRef.current = new kakao.maps.Marker({ map, position: center, title: '현재 위치' });
+          startMarkerRef.current = new kakao.maps.Marker({
+            map,
+            position: center,
+            title: '현재 위치',
+          });
         }
       );
     });
   }, []);
 
   useEffect(() => {
-    if (!destination || !mapInstance.current || !currentCoordsRef.current) return;
+    if (!destination || !mapInstance.current || !currentCoordsRef.current)
+      return;
 
     const kakao = window.kakao;
     const ps = new kakao.maps.services.Places();
@@ -45,7 +60,14 @@ const KakaoMap = ({ destination }) => {
       const destLat = parseFloat(result[0].y);
       const destLng = parseFloat(result[0].x);
 
-      const { longitude, latitude  } = currentCoordsRef.current;  // 저장된 좌표 사용
+      const { longitude, latitude  } = currentCoordsRef.current; // 저장된 좌표 사용
+
+      if (onCoordsChange) {
+        onCoordsChange({
+          origin: `${longitude},${latitude}`,
+          destination: `${destLng},${destLat}`,
+        });
+      }
 
       try {
         const response = await axiosInstance.post('/api/directions', {
