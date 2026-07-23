@@ -1,17 +1,21 @@
 import { useState } from 'react';
+import Navbar from '../components/layouts/Navbar';
 import KakaoMap from '../components/layouts/KakaoMap';
 import useCurrentLocation from '../hooks/useCurrentLocation';
 import CircularTimer from '../components/main/CircularTimer';
 
 const Menu = () => {
   const { address: currentAddr } = useCurrentLocation();
-  const [address, setAddress] = useState('');
-  const [searchedAddr, setSearchedAddr] = useState('');
+
+  const [destination, setDestination] = useState('');
+  const [searchedDestination, setSearchedDestination] = useState('');
   const [walkInfo, setWalkInfo] = useState(null);
 
-  const handleSearch = () => {
-    if (!address.trim()) return;
-    setSearchedAddr(address);
+  const handleSearch = async () => {
+    if (!destination.trim()) return;
+    setSearchedDestination(destination);
+    const result = await calcWalkingTime(destination);
+    setWalkInfo(result);
   };
 
   return (
