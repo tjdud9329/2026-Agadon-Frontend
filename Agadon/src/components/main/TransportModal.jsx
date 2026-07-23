@@ -1,71 +1,82 @@
-import React, { useState, useEffect, useRef } from 'react';
-import api from '../../api/axiosInstance'; // 🚨 경로가 맞는지 확인해 주세요!
+const formatClock = (value) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return new Intl.DateTimeFormat('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  }).format(date);
+};
 
-export default function TransportModal({ onClose, originCoords, destCoords }) {
-  // 택시 API 데이터를 담을 상태
-  const [taxiInfo, setTaxiInfo] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+const formatFare = (fare) =>
+  fare == null ? '요금 정보 없음' : `${Number(fare).toLocaleString('ko-KR')}원`;
 
-  // 🚨 무한 요청 방지를 위한 중복 호출 차단 Ref
-  const prevDestRef = useRef(null);
+const RouteSection = ({ label, route }) => {
+  if (!route) {
+    return (
+      <div className="py-3">
+        <span className="text-[11px] text-gray-400 font-medium">{label}</span>
+        <p className="mt-2 text-sm text-gray-300">
+          현재 이용 가능한 {label} 경로가 없습니다.
+        </p>
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    // 도착지 좌표가 없거나, 이전과 동일한 목적지라면 중복 API 호출을 아예 차단
-    if (!destCoords || prevDestRef.current === destCoords) {
-      if (!destCoords) setIsLoading(false);
-      return;
-    }
+  return (
+    <div className="py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <span className="text-[11px] text-gray-400 font-medium">{label}</span>
+          <div className="text-[22px] font-bold leading-tight mt-0.5">
+            약 {route.totalMinutes}분
+          </div>
+          <div className="text-[11px] text-gray-400 mt-1">
+            {formatFare(route.fare)}
+            {route.departureDeadline && (
+              <>
+                <span className="mx-1 opacity-50">|</span>
+                현위치 출발 {formatClock(route.departureDeadline)}
+              </>
+            )}
+          </div>
+        </div>
+        <span className="px-2 py-1 bg-[#666B74] text-white text-[10px] rounded-full">
+          {route.type}
+        </span>
+      </div>
 
-    prevDestRef.current = destCoords; // 현재 목적지 기억
+      <div className="mt-3">
+        <p className="text-sm font-bold">{route.name}</p>
+        <p className="text-[11px] leading-relaxed text-gray-300 mt-1">
+          {route.guide}
+        </p>
+        {route.scheduledAt && (
+          <p className="text-[11px] text-[#64F0AD] mt-2">
+            탑승 예정 {formatClock(route.scheduledAt)}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};
 
-    const fetchTaxiInfo = async () => {
-      try {
-        setIsLoading(true);
-
-        const payload = {
-          origin: originCoords || '126.9254,37.5515', // 기본 홍대 좌표
-          destination: destCoords,
-        };
-
-        const response = await api.post('/api/directions', payload);
-        const data = response.data;
-
-        if (data && data.routes && data.routes.length > 0) {
-          const summary = data.routes[0].summary;
-
-          setTaxiInfo({
-            fare: summary.fare.taxi || 0,
-            distance: summary.distance || 0,
-            duration: summary.duration || 0,
-          });
-        }
-      } catch (error) {
-        console.error('택시 정보 로드 실패:', error);
-        // 에러 시 폴백(Fallback) 데이터 표시
-        setTaxiInfo({ fare: 19900, distance: 17900, duration: 2700 });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchTaxiInfo();
-  }, [originCoords, destCoords]);
-
-  // 🛠️ 데이터 포맷팅 함수들
-  const formatDuration = (seconds) => {
-    const totalMinutes = Math.ceil(seconds / 60);
-    const hours = Math.floor(totalMinutes / 60);
-    const mins = totalMinutes % 60;
-
-    if (hours > 0) {
-      return `${hours} 시간 ${mins} 분`;
-    }
-    return `${mins} 분`;
-  };
-
-  const formatDistance = (meters) => {
-    return (meters / 1000).toFixed(1); // km 단위로 변환 후 소수점 1자리까지
-  };
+export default function TransportModal({ onClose, routes, currentTimeMs }) {
+  const taxi = routes.find((route) => route.type === 'TAXI') || null;
+  const nextNightBus =
+    routes
+      .filter((route) => route.type === 'NBUS')
+      .filter(
+        (route) =>
+          !route.departureDeadline ||
+          new Date(route.departureDeadline).getTime() >= currentTimeMs
+      )
+      .sort(
+        (a, b) =>
+          new Date(a.departureDeadline || 0).getTime() -
+          new Date(b.departureDeadline || 0).getTime()
+      )[0] || null;
 
   return (
     <div
@@ -73,76 +84,24 @@ export default function TransportModal({ onClose, originCoords, destCoords }) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-[340px] bg-[#42454C] rounded-[16px] p-5 text-white shadow-2xl relative"
-        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-[340px] bg-[#42454C] rounded-[16px] px-5 py-3 text-white shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
       >
-        {/* 🚖 택시 섹션 */}
-        <div className="flex justify-between items-end mb-4">
-          <div className="flex flex-col gap-0.5">
-            <span className="text-[11px] text-gray-400 font-medium">택시</span>
-
-            {/* 로딩 처리 및 API 데이터 바인딩 */}
-            {isLoading || !taxiInfo ? (
-              <div className="text-[22px] font-bold leading-tight text-gray-400 animate-pulse">
-                계산 중...
-              </div>
-            ) : (
-              <>
-                <div className="text-[22px] font-bold leading-tight">
-                  {formatDuration(taxiInfo.duration)}
-                </div>
-                <div className="text-[11px] text-gray-400 mt-1">
-                  {formatDistance(taxiInfo.distance)}km{' '}
-                  <span className="mx-1 opacity-50">|</span> 카드 약{' '}
-                  {taxiInfo.fare.toLocaleString()}원
-                </div>
-              </>
-            )}
-          </div>
-
+        <div className="flex items-center justify-between pt-1">
+          <h2 className="text-sm font-bold">심야 이동 방법</h2>
           <button
             type="button"
-            className="px-4 py-1.5 bg-[#666B74] text-white text-[11px] font-medium rounded-full hover:bg-gray-500 transition cursor-pointer mb-1"
+            onClick={onClose}
+            className="text-xl text-gray-300 cursor-pointer"
+            aria-label="닫기"
           >
-            자세히 보기
+            ×
           </button>
         </div>
 
-        {/* ➖ 구분선 */}
-        <div className="w-full h-[1px] bg-gray-600/50 mb-4"></div>
-
-        {/* 🚌 N버스 섹션 */}
-        <div className="flex flex-col gap-0.5 relative">
-          <span className="text-[11px] text-gray-400 font-medium">N버스</span>
-          <div className="text-[22px] font-bold leading-tight">
-            1 시간 49 분
-          </div>
-          <div className="text-[11px] text-gray-400 mt-1">
-            오전 1:56~3:46 <span className="mx-1 opacity-50">|</span> 2,500원
-          </div>
-
-          <div className="mt-4 text-[12px] text-gray-300 font-medium flex items-center gap-1.5">
-            동교동삼거리{' '}
-            <span className="text-gray-500 text-[11px]">14061</span>
-          </div>
-
-          <div className="flex items-center gap-1.5 mt-1">
-            <span className="px-1.5 py-0.5 bg-[#FF2B2B] text-white text-[9px] font-bold rounded-sm">
-              간선
-            </span>
-            <span className="text-sm font-bold">N75(심야)</span>
-          </div>
-
-          <div className="text-[11px] text-gray-400 mt-1">강남역9번출구</div>
-
-          <button
-            type="button"
-            className="absolute bottom-0 right-0 px-4 py-1.5 bg-[#666B74] text-white text-[11px] font-medium rounded-full hover:bg-gray-500 transition cursor-pointer"
-            onClick={() => alert('상세 경로 페이지로 이동합니다.')}
-          >
-            자세히 보기
-          </button>
-        </div>
+        <RouteSection label="택시" route={taxi} />
+        <div className="w-full h-px bg-gray-600/50" />
+        <RouteSection label="N버스" route={nextNightBus} />
       </div>
     </div>
   );

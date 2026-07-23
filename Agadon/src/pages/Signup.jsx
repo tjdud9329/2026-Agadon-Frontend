@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import red_alarm from '../assets/red_alarm.svg'; // 👈 import 추가!
 import api from '../api/axiosInstance';
@@ -9,36 +9,9 @@ export default function Signup({ onSignupSuccess }) {
   const [name, setName] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // 조건 체크 후 오류 점검 State
-  const [nameError, setNameError] = useState('');
-  const [emailError, setEmailError] = useState('');
   const [confirmPasswordError, setConfirmPasswordError] = useState('');
 
   const navigate = useNavigate();
-
-  // 이름 입력
-  const handleNameChange = (e) => {
-    const currentName = e.target.value;
-    setName(currentName);
-
-    if (!currentName) {
-      setNameError('닉네임을 입력해주세요.');
-    } else {
-      setNameError('');
-    }
-  };
-
-  // 이메일 입력
-  const handleEmailChange = (e) => {
-    const currentEmail = e.target.value;
-    setEmail(currentEmail);
-
-    if (!currentEmail) {
-      setEmailError('이메일을 입력해주세요.');
-    } else {
-      setEmailError('');
-    }
-  };
 
   // 비밀번호 입력
   const handlePasswordChange = (e) => {
@@ -86,7 +59,7 @@ export default function Signup({ onSignupSuccess }) {
     }
 
     try {
-      const response = await api.post('api/v1/auth/signup', {
+      const response = await api.post('/api/v1/auth/signup', {
         email: email,
         password: password,
         nickname: name,
@@ -127,7 +100,7 @@ export default function Signup({ onSignupSuccess }) {
                 type="text"
                 required
                 value={name}
-                onChange={handleNameChange}
+                onChange={(event) => setName(event.target.value)}
                 placeholder="닉네임을 입력하세요."
                 className="w-full p-5 rounded-[20px] border border-gray-40 text-txt placeholder-gray-40 focus:outline-none focus:border-red-06 focus:ring-1 focus:ring-red-10 transition"
               />
@@ -139,7 +112,7 @@ export default function Signup({ onSignupSuccess }) {
                 type="email"
                 required
                 value={email}
-                onChange={handleEmailChange}
+                onChange={(event) => setEmail(event.target.value)}
                 placeholder="이메일을 입력하세요."
                 className="w-full p-5 rounded-[20px] border border-gray-40 text-txt placeholder-gray-40 focus:outline-none focus:border-red-06 focus:ring-1 focus:ring-red-10 transition"
               />

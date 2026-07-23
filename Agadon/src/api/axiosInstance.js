@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL =
+  import.meta.env.VITE_BASE_URL ||
+  (import.meta.env.DEV ? 'http://localhost:8080' : '');
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL, //백엔드 API 주소 입력

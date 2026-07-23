@@ -26,20 +26,22 @@ const AlarmModal = ({
   const dragXRef = useRef(0);
   const sliderRef = useRef(null);
 
-  /* ── 초기화 ── */
-  useEffect(() => {
-    if (!isOpen) return;
-    setSeconds(initialSeconds);
-    setDragX(0);
-    dragXRef.current = 0;
-  }, [isOpen, initialSeconds]);
-
   /* ── 카운트다운 ── */
   useEffect(() => {
-    if (!isOpen || seconds <= 0) return;
-    const id = setInterval(() => setSeconds((s) => Math.max(0, s - 1)), 1000);
+    if (!isOpen) return undefined;
+    const id = setInterval(
+      () =>
+        setSeconds((currentSeconds) => {
+          if (currentSeconds <= 1) {
+            clearInterval(id);
+            return 0;
+          }
+          return currentSeconds - 1;
+        }),
+      1000
+    );
     return () => clearInterval(id);
-  }, [isOpen, seconds > 0]);
+  }, [isOpen]);
 
   /* ── 단계 판별 ── */
   const getStage = useCallback(() => {

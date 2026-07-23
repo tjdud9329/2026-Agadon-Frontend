@@ -5,7 +5,7 @@ import axiosInstance from '../../api/axiosInstance';
 const HONGIK_LAT = 37.5515;
 const HONGIK_LNG = 126.9254;
 
-const KakaoMap = ({ destination, origin, onWalkingTime, onCoordsChange }) => {
+const KakaoMap = ({ destination, origin, onCoordsChange, onError }) => {
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
 
@@ -45,10 +45,14 @@ const KakaoMap = ({ destination, origin, onWalkingTime, onCoordsChange }) => {
     const ps = new kakao.maps.services.Places();
 
     ps.keywordSearch(destination, async (result, status) => {
-      if (status !== kakao.maps.services.Status.OK) return;
+      if (status !== kakao.maps.services.Status.OK || !result[0]) {
+        onError?.('검색한 목적지의 좌표를 찾지 못했습니다.');
+        return;
+      }
 
-      const destLat = parseFloat(result[0].y);
-      const destLng = parseFloat(result[0].x);
+      const place = result[0];
+      const destLat = parseFloat(place.y);
+      const destLng = parseFloat(place.x);
 
       // 출발지 좌표 (Menu에서 넘어온 origin이 있으면 사용, 없으면 홍익대 고정)
       const originCoords = origin || `${HONGIK_LNG},${HONGIK_LAT}`;
@@ -57,6 +61,11 @@ const KakaoMap = ({ destination, origin, onWalkingTime, onCoordsChange }) => {
         onCoordsChange({
           origin: originCoords,
           destination: `${destLng},${destLat}`,
+          destinationName: place.place_name || destination,
+          destinationAddress:
+            place.road_address_name || place.address_name || destination,
+          latitude: destLat,
+          longitude: destLng,
         });
       }
 
@@ -107,9 +116,13 @@ const KakaoMap = ({ destination, origin, onWalkingTime, onCoordsChange }) => {
         mapInstance.current.setBounds(bounds);
       } catch (err) {
         console.error('길찾기 API 오류', err);
+        onError?.(
+          err.response?.data?.message ||
+            '지도 경로를 불러오지 못했지만 막차 정보는 계속 확인할 수 있습니다.'
+        );
       }
     });
-  }, [destination, origin, onCoordsChange]);
+  }, [destination, origin, onCoordsChange, onError]);
 
   return <div ref={mapRef} style={{ width: '100%', height: '500px' }} />;
 };
