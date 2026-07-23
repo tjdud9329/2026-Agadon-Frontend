@@ -101,7 +101,7 @@ const LineBadge = ({ line }) => (
 );
 
 /* ── 버스 종류 뱃지 ── */
-const BusTypeBadge = ({ type, number }) => (
+const BusTypeBadge = ({ type }) => (
   <span
     className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold text-white"
     style={{ backgroundColor: BUS_COLORS[type] || '#888' }}
