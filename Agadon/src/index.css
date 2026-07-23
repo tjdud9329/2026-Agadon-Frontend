@@ -1,1 +1,27 @@
 @import 'tailwindcss';
+
+@theme {
+  /* 기본 배경 / 텍스트 */
+  --color-bg: #121212;
+  --color-black: #000000;
+  --color-white: #ffffff;
+  --color-txt: #f2f2f7;
+
+  /* 회색 계열 */
+  --color-gray-05: #f4f5f6;
+  --color-gray-10: #e6e8ea;
+  --color-gray-20: #ccd1d5;
+  --color-gray-40: #88949f;
+  --color-gray-60: #56616b;
+  --color-gray-80: #34363e;
+
+  /* 레드 (메인) */
+  --color-red-05: #f88b87;
+  --color-red-10: #ff251d;
+  --color-red-15: #ac1f19;
+
+  /* 그린 (서브) */
+  --color-green-05: #4df3a0;
+  --color-green-10: #00dd6f;
+  --color-green-15: #21b16a;
+}

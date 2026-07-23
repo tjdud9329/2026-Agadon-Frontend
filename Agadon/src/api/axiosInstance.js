@@ -1,7 +1,9 @@
 import axios from 'axios';
 
+const BASE_URL = import.meta.env.VITE_BASE_URL;
+
 const axiosInstance = axios.create({
-  baseURL: '', //백엔드 API 주소 입력
+  baseURL: BASE_URL, //백엔드 API 주소 입력
   timeout: 5000,
   headers: {
     'Content-Type': 'application/json',
