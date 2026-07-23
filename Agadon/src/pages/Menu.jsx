@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Navbar from '../components/layouts/Navbar';
 import KakaoMap from '../components/layouts/KakaoMap';
-import useCurrentLocation from '../hooks/useCurrentLocation';
 import CircularTimer from '../components/main/CircularTimer';
 import TransportModal from '../components/main/TransportModal';
 import AlarmModal from '../components/main/AlarmModal';
@@ -22,7 +21,8 @@ const AUDIO_MAP = {
 };
 
 const Menu = () => {
-  const { address: currentAddr } = useCurrentLocation();
+  const HONGIK_ADDRESS = '서울특별시 마포구 와우산로 94';
+  const HONGIK_COORDS = '126.9254,37.5515';
 
   const [destination, setDestination] = useState('');
   const [searchedDestination, setSearchedDestination] = useState('');
@@ -34,6 +34,26 @@ const Menu = () => {
 
   // 교통수단 모달
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [alarmTime, setAlarmTime] = useState(null);
+
+  // 🚨 [핵심] 사용자가 입력한 검색어와 일치하는 Mock 역의 ID를 찾아냄 (없으면 기본값 1번 상수역)
+  const getSelectedStationId = () => {
+    if (!searchedDestination) return 1; // 검색 전 기본값
+
+    // '강남역' 또는 '강남'처럼 검색해도 매칭되도록 처리
+    const found = MOCK_STATIONS.find(
+      (station) =>
+        station.name.includes(searchedDestination) ||
+        searchedDestination.includes(station.name.replace('역', ''))
+    );
+
+    return found ? found.id : 1; // 일치하는 역이 없으면 기본 1번 역
+  };
+
+  // 🚨 현재 선택된 역의 상세 Mock 데이터 객체를 통째로 가져옴
+  const currentStationData =
+    MOCK_STATIONS.find((s) => s.id === getSelectedStationId()) ||
+    MOCK_STATIONS[0];
 
   // 알람 모달
   const [alarmOpen, setAlarmOpen] = useState(false);
@@ -248,6 +268,18 @@ const Menu = () => {
               });
             }}
           />
+        </div>
+
+        {/* 🚨 [추가됨] 선택된 역의 막차 정보 & 도보 시간 안내 카드 */}
+        <div className="mx-4 bg-[#2A2D35] border border-white/10 rounded-[16px] p-4 flex flex-col gap-2 shadow-md">
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-gray-400 font-medium">
+              선택된 노선 정보
+            </span>
+            <span className="text-xs font-bold text-[#00E676] bg-[#00E676]/10 px-2 py-0.5 rounded">
+              {currentStationData.line}
+            </span>
+          </div>
 
           {walkInfo && (
             <div className="absolute bottom-3 left-3 right-3 bg-black/70 backdrop-blur-md px-4 py-2.5 rounded-[16px] text-xs text-white flex justify-between items-center z-10 border border-white/10">
@@ -256,8 +288,55 @@ const Menu = () => {
                 (직선 {(walkInfo.meters / 1000).toFixed(1)}km)
               </span>
             </div>
-          )}
+            <div className="text-right">
+              <span className="text-xs text-gray-400 block">막차 시각</span>
+              <span className="text-sm font-extrabold text-[#FF2B2B]">
+                {currentStationData.lastTrainTime.slice(0, 5)}
+              </span>
+            </div>
+          </div>
         </div>
+
+        {/* 6. 대체 이동 수단 모달 */}
+        {isModalOpen && (
+          <TransportModal
+            onClose={() => setIsModalOpen(false)}
+            originCoords={mapCoords.origin}
+            destCoords={mapCoords.destination}
+          />
+        )}
+
+        {/* 4. 나의 경로 섹션 */}
+        <div className="mt-2 flex flex-col gap-3 m-4">
+          <h3 className="text-base font-bold text-white px-1">나의 경로</h3>
+
+          <div className="w-full h-[220px] bg-[#00E676] rounded-[24px] overflow-hidden shadow-inner flex items-center justify-center relative">
+            <KakaoMap
+              destination={searchedDestination}
+              origin={HONGIK_COORDS}
+              onWalkingTime={(min, m) =>
+                setWalkInfo({ minutes: min, meters: m })
+              }
+              onCoordsChange={(coords) => {
+                setMapCoords({
+                  origin: coords.origin || HONGIK_COORDS,
+                  destination: coords.destination,
+                });
+              }}
+            />
+
+            {walkInfo && (
+              <div className="absolute bottom-3 left-3 right-3 bg-black/70 backdrop-blur-md px-4 py-2.5 rounded-[16px] text-xs text-white flex justify-between items-center z-10 border border-white/10">
+                <span>도보 약 {walkInfo.minutes}분</span>
+                <span className="text-gray-400">
+                  (직선 {(walkInfo.meters / 1000).toFixed(1)}km)
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <Navbar />
       </div>
 
       {/* 7. 하단 네비게이션 바 */}
