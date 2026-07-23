@@ -45,7 +45,7 @@ const KakaoMap = ({ destination }) => {
       const destLat = parseFloat(result[0].y);
       const destLng = parseFloat(result[0].x);
 
-      const { latitude, longitude } = currentCoordsRef.current;  // 저장된 좌표 사용
+      const { longitude, latitude  } = currentCoordsRef.current;  // 저장된 좌표 사용
 
       try {
         const response = await axiosInstance.post('/api/directions', {
