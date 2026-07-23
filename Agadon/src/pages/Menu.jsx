@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import KakaoMap from '../components/layouts/KakaoMap';
 import useCurrentLocation from '../hooks/useCurrentLocation';
+import CircularTimer from '../components/main/CircularTimer';
 
 const Menu = () => {
   const { address: currentAddr } = useCurrentLocation();
@@ -15,6 +16,7 @@ const Menu = () => {
 
   return (
     <div>
+      <CircularTimer />
       <div>현위치: {currentAddr || '위치 불러오는 중...'}</div>
 
       <input
@@ -33,8 +35,8 @@ const Menu = () => {
 
       {walkInfo && (
         <p>
-          홍대입구역까지 도보 약 {walkInfo.minutes}분
-          (직선 {(walkInfo.meters / 1000).toFixed(1)}km)
+          홍대입구역까지 도보 약 {walkInfo.minutes}분 (직선{' '}
+          {(walkInfo.meters / 1000).toFixed(1)}km)
         </p>
       )}
     </div>
