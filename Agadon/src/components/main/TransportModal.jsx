@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../../api/axiosInstance'; // 🚨 경로가 맞는지 확인해 주세요!
 
 export default function TransportModal({ onClose, originCoords, destCoords }) {
@@ -6,31 +6,32 @@ export default function TransportModal({ onClose, originCoords, destCoords }) {
   const [taxiInfo, setTaxiInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // 🚨 무한 요청 방지를 위한 중복 호출 차단 Ref
+  const prevDestRef = useRef(null);
+
   useEffect(() => {
+    // 도착지 좌표가 없거나, 이전과 동일한 목적지라면 중복 API 호출을 아예 차단
+    if (!destCoords || prevDestRef.current === destCoords) {
+      if (!destCoords) setIsLoading(false);
+      return;
+    }
+
+    prevDestRef.current = destCoords; // 현재 목적지 기억
+
     const fetchTaxiInfo = async () => {
-      console.log('📍 모달로 전달받은 출발지 좌표:', originCoords);
-      console.log('📍 모달로 전달받은 도착지 좌표:', destCoords);
-      //  도착지 좌표가 아직 없으면 API를 부르지 않고 대기
-      if (!destCoords) {
-        setIsLoading(false);
-        return;
-      }
       try {
         setIsLoading(true);
 
-        // 부모 컴포넌트(Menu)에서 좌표를 안 넘겨줬을 경우를 대비한 스웨거 기본값
         const payload = {
-          origin: originCoords || '127.111202,37.394912',
-          destination: destCoords || '127.099323,37.401120',
+          origin: originCoords || '126.9254,37.5515', // 기본 홍대 좌표
+          destination: destCoords,
         };
 
-        // 기존 코드 ...
         const response = await api.post('/api/directions', payload);
         const data = response.data;
 
-        // 🚨 올려주신 JSON 구조 (data.routes[0].summary) 에 맞춰서 파싱합니다!
         if (data && data.routes && data.routes.length > 0) {
-          const summary = data.routes[0].summary; // summary 객체 추출
+          const summary = data.routes[0].summary;
 
           setTaxiInfo({
             fare: summary.fare.taxi || 0,
